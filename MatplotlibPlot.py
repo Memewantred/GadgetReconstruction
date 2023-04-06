@@ -44,7 +44,7 @@ def NormPlot(axes, x, y, label=None, color_index:int=0, plot=True):
         axes.plot(x, normDistribution.pdf(x), color=colors[color_index], label=label, linestyle="dashed")
     return mean, sigma, skew, kur
 
-def JointHeatMapPlot(fig, axes, x, y, bins, normed=True, colorbar=True, lower=0.5, upper=99.5, scale=matplotlib.colors.Normalize, colormap=cm.jet):
+def JointHeatMapPlot(fig, axes, x, y, bins, normed=True, colorbar=True, lower=0., upper=100., scale=matplotlib.colors.Normalize, colormap=cm.jet):
     H = 0
     xedges = yedges = np.array([])
     try:
@@ -73,10 +73,10 @@ def JointHeatMapPlot(fig, axes, x, y, bins, normed=True, colorbar=True, lower=0.
     axes.set_ylim(0, N)
     return H, xedges, yedges
 
-def Show2dSlice(pos, min, max, axis=2, bins=512, fig=None, axes=None, normed=True, colorbar=True, lower=0.5, upper=99.5, scale=matplotlib.colors.Normalize, colormap=cm.jet):
+def Show2dSlice(pos, min, max, axis=2, bins=512, fig=None, axes=None, normed=False, colorbar=True, lower=0.5, upper=99.5, scale=matplotlib.colors.Normalize, colormap=cm.viridis):
     pos = pos[(pos[:, axis] > min) & (pos[:, axis] < max)]
     if (fig is not None) and (axes is not None):
-        H, xedges, yedges = JointHeatMapPlot(fig, axes, pos[:, (axis+1)%3], pos[:, (axis+2)%3], bins=bins, normed=True, colorbar=colorbar, lower=lower, upper=upper, scale=scale, colormap=colormap)
+        H, xedges, yedges = JointHeatMapPlot(fig, axes, pos[:, (axis+1)%3], pos[:, (axis+2)%3], bins=bins, normed=normed, colorbar=colorbar, lower=lower, upper=upper, scale=scale, colormap=colormap)
     else:
         H, xedges, yedges = np.histogram2d(pos[:, (axis+1)%3], pos[:, (axis+2)%3], bins=bins, normed=normed)
     return H, xedges, yedges

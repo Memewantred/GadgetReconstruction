@@ -313,6 +313,14 @@ def WriteDTFE(filename, Nall, BoxSize, pos, vel, weight=None):
             f.write(weight.tobytes())
         f.write(vel.tobytes())
         
+def WriteSamplePoints(filename, Nsamples, pos, cellsize=None):
+    with open(filename, "wb") as f:
+        f.write(np.array([Nsamples], dtype=np.int32).tobytes())
+        f.write(pos.tobytes())
+        if cellsize is None:
+            cellsize = np.zeros([Nsamples, 3], dtype=np.float32)
+        f.write(cellsize.tobytes())
+        
 def getParticleDisp(ppos1, ppos2, pid1, pid2, boxSize):
     sort1 = np.argsort(pid1, axis=0)[:, 0]
     tmp = np.take(sort1, pid2.astype("int")[:,0]-1, axis=0)
@@ -353,7 +361,7 @@ def getHaloDisp(ppos1, pid1, pid2, grppos2, grplen2, boxSize, grpmass2=None):
         tmp_disp[tmp_disp < -boxSize / 2] = tmp_disp[tmp_disp < -boxSize / 2] + boxSize
         
         grpdisp[i] = np.sum(tmp_disp, axis=0) / grplen
-        grppos1[i] = grppos2[i] - grpdisp[i]
+        grppos1[i] = (grppos2[i] - grpdisp[i]) % boxSize
         start += grplen
     if grpmass2 is not None:
         return grpdisp, grppos1, grpmass2
