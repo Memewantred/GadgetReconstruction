@@ -24,6 +24,8 @@ class ReadGadget():
 
     def ReadGadget(self, type, target, FlagPtype=np.array([False, True, False, False, False, False]), deBugFlag=True, nFiles=-1, MpcUnit=1000):
         totalLen = len(os.listdir(self.dirpath))
+        if deBugFlag == True:
+            print("Total %s files in %s"%(totalLen, self.dirpath))
         nFiles = totalLen if nFiles < 0 else nFiles
         s = {}
         start = 0
@@ -39,6 +41,7 @@ class ReadGadget():
             with open(filename, "rb") as f:
                 if deBugFlag:
                     print("--------------Opening %s.%s --------------"%(self.name, fid))
+                    print("--------------Reading Header--------------")
                 s["header"] = self.ReadHeader(f, type)
                 Nall = np.sum(s["header"]['Nall'][FlagPtype]) if type=="snapshot" else s["header"]['NgroupsTot']
                 if fid == 0:
