@@ -20,9 +20,12 @@ def DensityPlot(axes, x, y, label, cov_factor=.25, hist=False, bins=20, color_in
         axes.hist(y, bins=bins, density=True, alpha=.5, color=colors[color_index], edgecolor=edgecolor, histtype=histtype)
     axes.set_xlim(x[0], x[-1])
     
-def Chi2Plot(axes, x, y, label=None, color_index:int=0, plot=True):
+def Chi2Plot(axes, x, y, label=None, color_index:int=0, plot=True, f0=None):
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    df, loc, scale = scipy.stats.chi2.fit(y)
+    if f0 is None:
+        df, loc, scale = scipy.stats.chi2.fit(y)
+    else:
+        df, loc, scale = scipy.stats.chi2.fit(y, floc=f0)
     chiDistribution = scipy.stats.chi2(df, loc, scale)
     if plot:
         if label == None:
