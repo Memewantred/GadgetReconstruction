@@ -287,15 +287,17 @@ def ReadBuffer(file:io.BufferedReader, size:int, dtype):
     res = np.frombuffer(buffer, dtype)
     return res
 
-def ReadDTFE(filename, weight=True):
+def ReadDTFE(filename, weight=True, order='C'):
     s = dict()
     with open(filename, "rb") as f:
         Npart = ReadBuffer(f, 4, np.int32)[0]
         s["BoxSize"] = ReadBuffer(f, 24, np.float32)
-        s["pos"] = ReadBuffer(f, Npart*3*4, np.float32).reshape(-1, 3)
+        s["pos"] = ReadBuffer(f, Npart*3*4, np.float32).reshape((-1, 3), order=order)
         if weight:
-            s["weight"] = ReadBuffer(f, Npart*4, np.float32).reshape(-1, 1)
-        s["vel"] = ReadBuffer(f, Npart*3*4, np.float32).reshape(-1, 3)
+            s["weight"] = ReadBuffer(f, Npart*4, np.float32).reshape((-1, 1), order=order)
+        # print(f.read(4))
+        # print(f.read(4))
+        s["vel"] = ReadBuffer(f, Npart*3*4, np.float32).reshape((-1, 3), order=order)
     # Check length
     for key in s.keys():
         if key == "BoxSize":
@@ -304,17 +306,61 @@ def ReadDTFE(filename, weight=True):
             print("Warning: %s length does not match"%(key))
     return s
 
-def WriteDTFE(filename, Nall, BoxSize, pos, vel, weight=None):
+def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=None, Ndust=0, WeightDust=1., order='C'):
+    """
+    Write catalogue to DTFE type, with data type np.float32
+    DustType: None, "Uniform", "Generated"
+    WeightDust is set to 1. as default, halo weight should adjust according to grplength, support numpy array
+    weight and WeightDust are np.float32
+    """
     with open(filename, "wb") as f:
-        f.write(np.array([Nall], dtype=np.int32).tobytes())
-        f.write(np.array([0., BoxSize, 0., BoxSize, 0., BoxSize], dtype=np.float32).tobytes())
-        f.write(pos.tobytes())
+        # Check data
+        if (Npart != len(pos)): 
+            raise ValueError(f"Pos should have length Nall={Npart} instead of len(pos)={len(pos)}")
+        f.write(np.array([Npart + Ndust], dtype=np.int32).tobytes(order))
+        f.write(np.array([0., BoxSize, 0., BoxSize, 0., BoxSize], dtype=np.float32).tobytes(order))
+        # Write pos
+        if DustType == "Uniform":
+            tmp = np.random.random([Ndust, 3]).astype(np.float32) * BoxSize
+            pos = np.vstack((pos, tmp))
+        elif DustType == "Generated":
+            pass
+        # print(pos)
+        f.write(pos.tobytes(order))
+        # Write weight
         if weight is not None:
-            f.write(weight.tobytes())
+            try:
+                if (Npart != len(weight)):
+                    raise ValueError(f"Weight should have length Nall={Npart} instead of len(weight)={len(weight)}")
+            except:
+                weight = weight * np.ones([Npart, 1], dtype=np.float32)
+            # if DustType is not None:
+            #     try:
+            #         if (Ndust != len(WeightDust)):
+            #             raise ValueError(f"WeightDust should have length Ndust={Ndust} instead of len(WeightDust)={len(WeightDust)}")
+            #     except:
+            #         WeightDust = WeightDust * np.ones([Ndust, 1], dtype=np.int32)
+                # weight = np.vstack((weight, WeightDust))
+            # print(weight)
+            # f.write(weight.tobytes(order))
         else:
-            weight = np.ones(Nall, dtype=np.float32)
-            f.write(weight.tobytes())
-        f.write(vel.tobytes())
+            weight = np.ones(Npart, dtype=np.float32)
+            print("Warning: particle weight is set to default value 1.")
+        if DustType is not None:
+            try:
+                if (Ndust != len(WeightDust)):
+                    raise ValueError(f"WeightDust should have length Ndust={Ndust} instead of len(WeightDust)={len(WeightDust)}")
+            except:
+                WeightDust = WeightDust * np.ones([Ndust, 1], dtype=np.float32)
+            weight = np.vstack((weight, WeightDust))
+        f.write(weight.tobytes(order))
+        # Write vel
+        if vel is not None:
+            f.write(vel.tobytes(order))
+            if DustType is not None:
+                f.write(np.zeros([Ndust, 3], dtype=np.float32))
+        else:
+            vel = np.zeros([Npart + Ndust, 3], dtype=np.float32)
         
 def WriteSamplePoints(filename, Nsamples, pos, cellsize=None):
     with open(filename, "wb") as f:

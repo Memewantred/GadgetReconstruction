@@ -25,7 +25,7 @@ def Chi2Plot(axes, x, y, label=None, color_index:int=0, plot=True, f0=None):
     if f0 is None:
         df, loc, scale = scipy.stats.chi2.fit(y)
     else:
-        df, loc, scale = scipy.stats.chi2.fit(y, floc=f0)
+        df, loc, scale = scipy.stats.chi2.fit(y, f0=f0)
     chiDistribution = scipy.stats.chi2(df, loc, scale)
     if plot:
         if label == None:
@@ -47,7 +47,7 @@ def NormPlot(axes, x, y, label=None, color_index:int=0, plot=True):
         axes.plot(x, normDistribution.pdf(x), color=colors[color_index], label=label, linestyle="dashed")
     return mean, sigma, skew, kur
 
-def JointHeatMapPlot(fig, axes, x, y, bins, normed=True, colorbar=True, lower=0., upper=100., scale=matplotlib.colors.Normalize, colormap=cm.jet):
+def JointHeatMapPlot(fig, axes, x, y, bins, normed=True, colorbar=True, vmin=None, vmax=None, lower=0., upper=100., scale=matplotlib.colors.Normalize, colormap=cm.jet, fraction=0.046, pad=0.04):
     H = 0
     xedges = yedges = np.array([])
     try:
@@ -61,11 +61,11 @@ def JointHeatMapPlot(fig, axes, x, y, bins, normed=True, colorbar=True, lower=0.
     except:
         H, xedges, yedges = np.histogram2d(x, y, bins=bins, normed=normed)
     if colorbar:
-        vmax = np.percentile(H, upper)
-        vmin = np.percentile(H, lower)
+        vmax = np.percentile(H, upper) if vmax is None else vmax
+        vmin = np.percentile(H, lower) if vmin is None else vmin
         norm = scale(vmin=vmin, vmax=vmax)
         pcm = axes.imshow(H, cmap=colormap, norm=norm)
-        fig.colorbar(pcm, ax=axes, extend='both')
+        fig.colorbar(pcm, ax=axes, extend='both', fraction=fraction, pad=pad)
     else:
         axes.imshow(H)
     try:
