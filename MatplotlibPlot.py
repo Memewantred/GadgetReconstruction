@@ -83,3 +83,13 @@ def Show2dSlice(pos, min, max, axis=2, bins=512, fig=None, axes=None, normed=Fal
     else:
         H, xedges, yedges = np.histogram2d(pos[:, (axis+1)%3], pos[:, (axis+2)%3], bins=bins, normed=normed)
     return H, xedges, yedges
+
+def myimshow(H, fig, axes, normed=True, colorbar=True, vmin=None, vmax=None, lower=0., upper=100., scale=matplotlib.colors.Normalize, colormap=cm.jet, fraction=0.046, pad=0.04):
+    if colorbar:
+        vmax = np.percentile(H, upper) if vmax is None else vmax
+        vmin = np.percentile(H, lower) if vmin is None else vmin
+        norm = scale(vmin=vmin, vmax=vmax)
+        pcm = axes.imshow(H, cmap=colormap, norm=norm)
+        fig.colorbar(pcm, ax=axes, extend='both', fraction=fraction, pad=pad)
+    else:
+        axes.imshow(H)
