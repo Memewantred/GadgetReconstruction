@@ -19,6 +19,7 @@ class Read():
     def __init__(self, idLen=8):
         self.idLen = idLen # id length in bytes for snapshots
         self.deBugFlag = False
+        self.NDFIELD_MAX_DIMS = 20
 
     def setPath(self, dirname, filename):
         self.name = filename
@@ -152,16 +153,43 @@ class Read():
                 print("--------------Closing %s --------------"%(self.filename))
         return s
     
-    def WriteNDfield(filename, order='C'):
+    def WriteNDfield(self, filename, ndims, dims, fdims_index, datatype, x0, delta, data:np.ndarray, order='C', comment=None, deBugFlag=False):
+        self.deBugFlag = deBugFlag
+        comment = "Created by %s"%(self.__class__.__name__) if comment is None else comment
+        print("--------------Writing %s --------------"%(filename))
         with open(filename, "wb") as f:
-            # Check data
-            if (Npart != len(pos)): 
-                raise ValueError(f"Pos should have length Nall={Npart} instead of len(pos)={len(pos)}")
-            print("------------------------------------------")
-            print(f"Writing to {filename}")
-            f.write(np.array([Npart + Ndust], dtype=np.int32).tobytes(order))
-            f.write(np.array([0., BoxSize, 0., BoxSize, 0., BoxSize], dtype=np.float32).tobytes(order))
-            f.write(pos.tobytes(order))
+            # Write tag
+            print("--------------Writing tag--------------") if self.deBugFlag else None
+            self.__WriteBlock__(f, "NDFIELD", length=16, order=order)
+            # Write header
+            print("--------------Writing header--------------") if self.deBugFlag else None
+            s = {}
+            s["comment"] = struct.pack("80s", comment.encode())
+            s["ndims"] = np.int32(ndims).tobytes()
+            if len(dims) < self.NDFIELD_MAX_DIMS:
+                dims = np.append(dims, np.zeros(20 - len(dims), dtype=np.int32))
+            s["dims"] = dims.astype(np.int32)
+            s["fdims_index"] = np.int32(fdims_index).tobytes()
+            DATATYPE = (np.char, "not supported", np.int16, np.uint16, np.int32, np.uint32, np.int64, np.uint64, np.float32, np.float64)
+            tmp = 1 << 0
+            for i in range(10):
+                if DATATYPE[i] == datatype:
+                    s["datatype"] = np.int32(tmp).tobytes()
+                    break
+                tmp = tmp << 1
+            if len(x0) < self.NDFIELD_MAX_DIMS:
+                x0 = np.append(x0, np.zeros(20 - len(x0), dtype=np.float32))
+            s["x0"] = x0
+            if len(delta) < self.NDFIELD_MAX_DIMS:
+                delta = np.append(delta, np.zeros(20 - len(delta), dtype=np.float32))
+            s["delta"] = delta
+            s["dummy"] = struct.pack('160s', b'')
+            self.__WriteBlock__(f, s, length=652, order=order)
+            # Write data
+            print("--------------Writing data--------------") if self.deBugFlag else None
+            length = np.prod(data.shape) * np.dtype(datatype).itemsize
+            self.__WriteBlock__(f, data, length=length, order=order)
+        print("--------------Closing %s --------------"%(filename))
 
     def ReadGadgetHeader(self, file:io.BufferedReader, type:str):
         dict = {}
@@ -418,22 +446,13 @@ class Read():
             print("------Read Block with length", nBytes, "------")
         return res
     
-    def __WriteBlock__(self, file:io.BufferedReader, input:Union[bytes, str, np.ndarray]=None, length:int=0):
-        # loop over all types
-        if input != None:
-            if isinstance(input, bytes):
-                binary = input
-                nBytes = len(binary)
-            elif isinstance(input, str):
-                binary = input.encode()
-                nBytes = length if length > 0 else len(binary)
-                binary = struct.pack(f"{nBytes}s", binary)
-            elif isinstance(input, np.ndarray):
-                binary = input.tobytes()
-                nBytes = len(binary)
-            else:
-                print("Type not supported")
-        
+    def __WriteBlock__(self, file:io.BufferedReader, input:Union[bytes, str, np.ndarray, dict]=None, length:int=0, order='C'):
+        """
+        Write a Fortran style block of data to file
+        Input can be bytes, str, np.ndarray, dict
+        Note: dict should not contain str
+        """
+        binary, nBytes = self.__Input2Bytes(input, length)
         head = struct.pack('i', nBytes)
         file.write(head)
         file.write(binary)
@@ -441,6 +460,43 @@ class Read():
         if self.deBugFlag:
             print("------Write Block with length", nBytes, "------")
         return
+    
+    def __Input2Bytes(self, input:Union[bytes, str, np.ndarray, dict]=None, length:int=0):
+        """
+        Convert input to bytes
+        Note: dict should not contain str
+        """
+        # loop over all types
+        if input is not None:
+            if isinstance(input, bytes):
+                print("--------------Writing bytes--------------") if self.deBugFlag else None
+                binary = input
+                nBytes = len(binary)
+            elif isinstance(input, str):
+                print("--------------Writing str--------------") if self.deBugFlag else None
+                binary = input.encode()
+                nBytes = length if length > 0 else len(binary)
+                binary = struct.pack(f"{nBytes}s", binary)
+            elif isinstance(input, np.ndarray):
+                print("--------------Writing np.ndarray--------------") if self.deBugFlag else None
+                binary = input.tobytes()
+                nBytes = len(binary)
+            elif isinstance(input, dict):
+                binary = b''
+                nBytes = 0
+                for key in input.keys():
+                    print("--------------Writing dict[%s] --------------"%key) if self.deBugFlag else None
+                    item = input[key]
+                    tmp = self.__Input2Bytes(item)
+                    binary += tmp[0]
+                    nBytes += tmp[1]
+            else:
+                print("Type not supported")
+        print("input has nBytes:", nBytes) if self.deBugFlag else None
+        if length > 0 and nBytes != length:
+            print(f"length {length} is not equal to nBytes {nBytes}")
+            raise ValueError("invalid length")
+        return binary, nBytes
 
     def __tupleUnpack(self, tuple:tuple, size:int, dict:dict, key=''):
         dict[key] = tuple[0:size]
