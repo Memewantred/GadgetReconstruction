@@ -82,8 +82,7 @@ class Read():
             dict[item] = s[item]
         return dict
     
-    def ReadNDskel(self, target="All", deBugFlag=True, MpcUnit=1000):
-        self.deBugFlag = deBugFlag
+    def ReadNDskel(self, target="All", deBugFlag=False, MpcUnit=1000):
         self.nsegdata = 0
         self.nnodedata = 0
         self.nsegs = 0
@@ -93,7 +92,7 @@ class Read():
         scale = MpcUnit / 1000.
         filename = self.filename
         with open(filename, "rb") as f:
-            if self.deBugFlag:
+            if deBugFlag:
                 print("--------------Opening %s --------------"%(self.filename))
             s["filetype"] = self.ReadNDskelTag(f)
             s["header"] = self.ReadNDskelHeader(f)
@@ -103,10 +102,10 @@ class Read():
             s["nodepos"] = self.ReadNDskelNodePos(f, length=self.nnodes*self.ndims*4)
             s["segdata"] = self.ReadNDskelSegData(f)
             s["nodedata"] = self.ReadNDskelNodeData(f)
-            if self.deBugFlag:
+            if deBugFlag:
                 print("Read seg_str and node_str are not implemented yet")
             
-            if self.deBugFlag:
+            if deBugFlag:
                 print("--------------Closing %s --------------"%(self.filename))
         
         dict = {}
@@ -121,8 +120,9 @@ class Read():
                 dict[item] = s[item]
             return dict
         
-    def ReadNDfield(self, target="All", deBugFlag=True):
+    def ReadNDfield(self, target="All", deBugFlag=False):
         s = {}
+        self.deBugFlag = deBugFlag
         filename = self.filename
         with open(filename, "rb") as f:
             if self.deBugFlag:
@@ -193,7 +193,7 @@ class Read():
 
     def ReadGadgetHeader(self, file:io.BufferedReader, type:str):
         dict = {}
-        binary = self.__ReadBlock__(file)
+        binary, _ = self.__ReadBlock__(file)
         if binary == None: # Check Validity
             raise ValueError("no bytes can be read")
         offset = 0
@@ -235,18 +235,21 @@ class Read():
         return dict
     
     def ReadNDskelTag(self, file:io.BufferedReader, length:int=0):
-        binary = self.__ReadBlock__(file)
+        print("------Reading NDskel Tag------") if self.deBugFlag else None
+        binary, _ = self.__ReadBlock__(file)
         if self.deBugFlag:
             print("Reading NDskel Tag")
         if binary == None: # Check Validity
             raise ValueError("no bytes can be read")
         tag, _ = self.__BufferUnpack__(binary, 1, 'S16', 1*16, 0)
+        print("Reading NDskel Tag finished!") if self.deBugFlag else None
         return tag.decode('utf-8')
     
     def ReadNDskelHeader(self, file:io.BufferedReader, length:int=500):
         # Warning: The length of header is 500 Bytes, while the dummy bytes of Fortran shows a wrong length
+        print("------Reading NDskel Header------") if self.deBugFlag else None
         dict = {}
-        binary = self.__ReadBlock__(file, length)
+        binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Header")
         if binary == None: # Check Validity
@@ -267,11 +270,13 @@ class Read():
         self.nsegdata = dict["nsegdata"]
         dict["nnodedata"], offset = self.__BufferUnpack__(binary, 1, np.int32, 1*4, offset)
         self.nnodedata = dict["nnodedata"]
+        print("ndims: %s"%(dict["ndims"]), "nsegs: %s"%(dict["nsegs"]), "nnodes: %s"%(dict["nnodes"])) if self.deBugFlag else None
+        print("Reading NDskel Header finished!") if self.deBugFlag else None
         return dict
     
     def ReadNDfieldHeader(self, file:io.BufferedReader, length:int=652):
         dict = {}
-        binary = self.__ReadBlock__(file, length)
+        binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDfield Header")
         if binary == None: # Check Validity
@@ -295,7 +300,8 @@ class Read():
         return dict
     
     def ReadNDskelSegDataInfo(self, file:io.BufferedReader, length:int=0):
-        binary = self.__ReadBlock__(file, length)
+        print("------Reading NDskel Seg Data Info------") if self.deBugFlag else None
+        binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Seg Data Info")
         if binary == None: # Check Validity
@@ -304,10 +310,12 @@ class Read():
             raise ValueError(f"length of binary {len(binary)} is not equal to {self.nsegdata*20}")
         res, _ = self.__BufferUnpack__(binary, self.nsegdata, 'S20', self.nsegdata*20, 0)
         res = [comment.decode('utf-8') for comment in res]
+        print("Reading NDskel Seg Data Info finished!") if self.deBugFlag else None
         return res
     
     def ReadNDskelNodeDataInfo(self, file:io.BufferedReader, length:int=0):
-        binary = self.__ReadBlock__(file, length)
+        print("------Reading NDskel Node Data Info------") if self.deBugFlag else None
+        binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Node Data Info")
         if binary == None: # Check Validity
@@ -316,12 +324,18 @@ class Read():
             raise ValueError(f"length of binary {len(binary)} is not equal to {self.nnodedata*20}")
         res, _ = self.__BufferUnpack__(binary, self.nnodedata, 'S20', self.nnodedata*20, 0)
         res = [comment.decode('utf-8') for comment in res]
+        print("Reading NDskel Node Data Info finished!") if self.deBugFlag else None
         return res
     
     def ReadNDskelSegPos(self, file:io.BufferedReader, length:int=0):
         # Note: the size of segpos is nsegs * 2 * ndims, one can find the segpos of segindex[j] by segpos[segindex[j]*2*ndims:(segindex[j]+1)*2*ndims]
         # Warning: the shape of segpos is not the same as in tutorial, it is (nsegs, 2, ndims)
-        binary = self.__ReadBlock__(file, length)
+        print("------Reading NDskel Seg Pos------") if self.deBugFlag else None
+        if length <= 0:
+            binary, nBytes = self.__ReadBlock__(file, length=4*2*self.nsegs*self.ndims)
+            print(f"WARNING: Reading NDskel Seg Pos with block length {nBytes} failed, try reading with length {4*2*self.nsegs*self.ndims}") if nBytes != 4*2*self.nsegs*self.ndims else None
+        else:
+            binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Seg Pos")
         if binary == None: # Check Validity
@@ -330,12 +344,18 @@ class Read():
             raise ValueError(f"length of binary {len(binary)} is not equal to (nsegs,2,ndims) {self.nsegs} * 2 * {self.ndims}")
         res, _ = self.__BufferUnpack__(binary, self.nsegs * 2 * self.ndims, np.float32, self.nsegs * 2 * self.ndims * 4, 0)
         res = res.reshape(self.nsegs, 2, self.ndims)
+        print("Reading NDskel Seg Pos finished!") if self.deBugFlag else None
         return res
     
     def ReadNDskelNodePos(self, file:io.BufferedReader, length:int=0):
         # Note: the size of segpos is nnodes * ndims, one can find the segpos of segindex[j] by segpos[segindex[j]*2*ndims:(segindex[j]+1)*2*ndims]
         # Warning: The length of NodePos is nnodes * ndims * 4 Bytes, while the dummy bytes of Fortran doubkes the correct length
-        binary = self.__ReadBlock__(file, length)
+        print("------Reading NDskel Node Pos------") if self.deBugFlag else None
+        if length <= 0:
+            binary, nBytes = self.__ReadBlock__(file, length=4*self.nnodes*self.ndims)
+            print(f"WARNING: Reading NDskel Node Pos with block length {nBytes} failed, try reading with length {4*self.nnodes*self.ndims}") if nBytes != 4*self.nnodes*self.ndims else None
+        else:
+            binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Node Pos")
         if binary == None: # Check Validity
@@ -344,10 +364,16 @@ class Read():
             raise ValueError(f"length of binary {len(binary)} is not equal to (nnodes,ndims) {self.nnodes} * {self.ndims}")
         res, _ = self.__BufferUnpack__(binary, self.nnodes * self.ndims, np.float32, self.nnodes * self.ndims * 4, 0)
         res = res.reshape(self.nnodes, self.ndims)
+        print("Reading NDskel Node Pos finished!") if self.deBugFlag else None
         return res
     
     def ReadNDskelSegData(self, file:io.BufferedReader, length:int=0):
-        binary = self.__ReadBlock__(file, length)
+        print("------Reading NDskel Seg Data------") if self.deBugFlag else None
+        if length <= 0:
+            binary, nBytes = self.__ReadBlock__(file, length=8*self.nsegs*self.nsegdata)
+            print(f"WARNING: Reading NDskel Seg Data with block length {nBytes} failed, try reading with length {8*self.nsegs*self.nsegdata}") if nBytes != 8*self.nsegs*self.nsegdata else None
+        else:
+            binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Seg Data")
         if binary == None: # Check Validity
@@ -356,10 +382,16 @@ class Read():
             raise ValueError(f"length of binary {len(binary)} is not equal to (nsegss,nsegdata) {self.nsegs} * {self.nsegdata}")
         res, _ = self.__BufferUnpack__(binary, self.nsegs * self.nsegdata, np.float64, self.nsegs * self.nsegdata * 8, 0)
         res = res.reshape(self.nsegs, self.nsegdata)
+        print("Reading NDskel Seg Data finished!") if self.deBugFlag else None
         return res
     
     def ReadNDskelNodeData(self, file:io.BufferedReader, length:int=0):
-        binary = self.__ReadBlock__(file, length)
+        print("------Reading NDskel Node Data------") if self.deBugFlag else None
+        if length <= 0:
+            binary, nBytes = self.__ReadBlock__(file, length=8*self.nnodes*self.nnodedata)
+            print(f"WARNING: Reading NDskel Node Data with block length {nBytes} failed, try reading with length {8*self.nnodes*self.nnodedata}") if nBytes != 8*self.nnodes*self.nnodedata else None
+        else:
+            binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDskel Node Data")
         if binary == None: # Check Validity
@@ -368,11 +400,12 @@ class Read():
             raise ValueError(f"length of binary {len(binary)} is not equal to (nnodes,nnodedata) {self.nnodes} * {self.nnodedata}")
         res, _ = self.__BufferUnpack__(binary, self.nnodes * self.nnodedata, np.float64, self.nnodes * self.nnodedata * 8, 0)
         res = res.reshape(self.nnodes, self.nnodedata)
+        print("Reading NDskel Node Data finished!") if self.deBugFlag else None
         return res
     
     def ReadNDfieldData(self, file:io.BufferedReader, shape, dtype):
         length = np.prod(shape) * np.dtype(dtype).itemsize
-        binary = self.__ReadBlock__(file, length)
+        binary, _ = self.__ReadBlock__(file, length)
         if self.deBugFlag:
             print("Reading NDfield Data")
         if binary == None: # Check Validity
@@ -437,14 +470,15 @@ class Read():
         res = file.read(nBytes)
         
         check = file.read(4)
-        if length <= 0:
-            nBytesCheck = struct.unpack('i', check)[0]
-            if (nBytes != nBytesCheck):
-                print("head has Bytes", nBytes, ", but tail Bytes", nBytesCheck)
+        # if length <= 0:
+        nBytesCheck = struct.unpack('i', check)[0]
+        if (nBytes != nBytesCheck):
+            print("head has Bytes", nBytes, ", but tail Bytes", nBytesCheck)
+            if length <= 0:
                 raise ValueError("invalid check length")
         if self.deBugFlag:
             print("------Read Block with length", nBytes, "------")
-        return res
+        return res, nBytesCheck
     
     def __WriteBlock__(self, file:io.BufferedReader, input:Union[bytes, str, np.ndarray, dict]=None, length:int=0, order='C'):
         """
@@ -516,7 +550,7 @@ class Read():
         for i, flag in enumerate(FlagPtype):
             if flag:
                 Nrows = Npart[i]
-                binary = self.__ReadBlock__(file)
+                binary, _ = self.__ReadBlock__(file)
                 if binary == None:
                     return s, 1 # the end of the file
                 if target == "id":
@@ -544,7 +578,7 @@ class Read():
     def __GroupBinaryUnpack__(self, s, file, target, start, length, scale=1):
         start = int(start)
         Ngroups = s["header"]["Ngroups"]
-        binary = self.__ReadBlock__(file)
+        binary, _ = self.__ReadBlock__(file)
         
         if binary == None:
             return s, 1 # the end of the file
@@ -581,7 +615,7 @@ class Read():
     def __ReadHeader(self, file:io.BufferedReader, type:str):
         """numpy.frombuffer is much faster than struct.unpack"""
         dict = {}
-        binary = self.__ReadBlock__(file)
+        binary, _ = self.__ReadBlock__(file)
         if binary == None: # Check Validity
             raise ValueError("no bytes can be read")
         # Read Head
@@ -626,17 +660,19 @@ def ReadBuffer(file:io.BufferedReader, size:int, dtype):
     res = np.frombuffer(buffer, dtype)
     return res
 
-def ReadDTFE(filename, weight=True, order='C'):
+def ReadDTFE(filename, weight=True, order='C', debug=False):
     s = dict()
     with open(filename, "rb") as f:
         Npart = ReadBuffer(f, 4, np.int32)[0]
         s["BoxSize"] = ReadBuffer(f, 24, np.float32)
+        print(s["BoxSize"]) if debug else None
         s["pos"] = ReadBuffer(f, Npart*3*4, np.float32).reshape((-1, 3), order=order)
+        print(s["pos"]) if debug else None
         if weight:
             s["weight"] = ReadBuffer(f, Npart*4, np.float32).reshape((-1, 1), order=order)
-        # print(f.read(4))
-        # print(f.read(4))
+            print(s["weight"]) if debug else None
         s["vel"] = ReadBuffer(f, Npart*3*4, np.float32).reshape((-1, 3), order=order)
+        print(s["vel"]) if debug else None
     # Check length
     for key in s.keys():
         if key == "BoxSize":
@@ -645,7 +681,7 @@ def ReadDTFE(filename, weight=True, order='C'):
             print("Warning: %s length does not match"%(key))
     return s
 
-def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=None, Ndust=0, WeightDust=1., order='C'):
+def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=None, DustPos=None, Ndust=0, WeightDust=1., order='C'):
     """
     Write catalogue to DTFE type, with data type np.float32
     DustType: None, "Uniform", "Generated"
@@ -665,7 +701,7 @@ def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=Non
             tmp = np.random.random([Ndust, 3]).astype(np.float32) * BoxSize
             pos = np.vstack((pos, tmp))
         elif DustType == "Generated":
-            pass
+            pos = np.vstack((pos, DustPos)).astype(np.float32)
         # print(pos)
         f.write(pos.tobytes(order))
         # Write weight
@@ -674,7 +710,7 @@ def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=Non
                 if (Npart != len(weight)):
                     raise ValueError(f"Weight should have length Nall={Npart} instead of len(weight)={len(weight)}")
             except:
-                weight = weight * np.ones([Npart, 1], dtype=np.float32)
+                weight = weight.astype(np.float32)
             # if DustType is not None:
             #     try:
             #         if (Ndust != len(WeightDust)):
@@ -702,6 +738,9 @@ def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=Non
                 f.write(np.zeros([Ndust, 3], dtype=np.float32))
         else:
             vel = np.zeros([Npart + Ndust, 3], dtype=np.float32)
+        
+        print(f"Finished!")
+        print("------------------------------------------")
         
 def WriteSamplePoints(filename, Nsamples, pos, cellsize=None):
     with open(filename, "wb") as f:
