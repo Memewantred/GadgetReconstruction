@@ -459,6 +459,7 @@ class Read():
         SegStr_List = []
         for i in range(self.nsegs):
             tmp = NDskl_seg_str()
+            # Old version
             tmp.pos_index = ReadBuffer(file, 4, np.int32)[0]
             tmp.nodes = ReadBuffer(file, 2*4, np.int32)
             tmp.flags = ReadBuffer(file, 4, np.int32)[0]
@@ -470,7 +471,7 @@ class Read():
         print("Warning: dummy block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
         if self.deBugFlag:
             print("Reading NDskel Seg Str finished!")
-        return
+        return SegStr_List
     
     def __ReadBody__(self, s:dict, file:io.BufferedReader, type:str, target:str, FlagPtype, FlagMass, start, length, scale):
         if self.deBugFlag:
@@ -922,7 +923,7 @@ class NDskl_seg_str:
             raise ValueError("flags is not valid")
         if self.index < 0:
             raise ValueError("index is not valid")
-        if self.next_seg < 0:
+        if self.next_seg < -1:
             raise ValueError("next_seg is not valid")
-        if self.prev_seg < 0:
+        if self.prev_seg < -1:
             raise ValueError("prev_seg is not valid")
