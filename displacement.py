@@ -1,4 +1,3 @@
-from typing_extensions import Self
 from typing import Union
 import numpy as np
 import sys
@@ -82,7 +81,7 @@ class Read():
             dict[item] = s[item]
         return dict
     
-    def ReadNDskel(self, target="All", deBugFlag=False, MpcUnit=1000):
+    def ReadNDskel(self, target="All", deBugFlag=False, MpcUnit=1000, Nodestr=False, Segstr=False):
         self.nsegdata = 0
         self.nnodedata = 0
         self.nsegs = 0
@@ -102,6 +101,10 @@ class Read():
             s["nodepos"] = self.ReadNDskelNodePos(f, length=self.nnodes*self.ndims*4)
             s["segdata"] = self.ReadNDskelSegData(f)
             s["nodedata"] = self.ReadNDskelNodeData(f)
+            if Nodestr:
+                s["nodestr"] = self.ReadNDskelNodeStr(f)
+            if Segstr:
+                s["segstr"] = self.ReadNDskelSegStr(f)
             if deBugFlag:
                 print("Read seg_str and node_str are not implemented yet")
             
@@ -424,13 +427,50 @@ class Read():
         # Note: Begins from Line 1539 of ${DISPERSE_SRC}/src/C/NDskeleton.c
         # The dummy bytes of Fortran is 0 instead of correct size.
         # All nnodes are contained in a block.
-        pass
+        if self.deBugFlag:
+            print("Reading NDskel Node Str")
+        print("Warning: dummy block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
+        NodeStr_List = []
+        for i in range(self.nnodes):
+            tmp = NDskl_node_str()
+            tmp.pos_index = ReadBuffer(file, 4, np.int32)[0]
+            tmp.flags = ReadBuffer(file, 4, np.int32)[0]
+            tmp.nnext = ReadBuffer(file, 4, np.int32)[0]
+            tmp.type = ReadBuffer(file, 4, np.int32)[0]
+            tmp.index = ReadBuffer(file, 4, np.int32)[0]
+            tmp.nsegs = ReadBuffer(file, tmp.nnext * 4, np.int32)
+            array = ReadBuffer(file, tmp.nnext * 2 * 4, np.int32).reshape(tmp.nnext, 2)
+            tmp.nextNode = array[:,0]
+            tmp.nextSeg = array[:,1]
+            tmp.__checkValid__()
+            NodeStr_List.append(tmp)
+        print("Warning: check block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
+        if self.deBugFlag:
+            print("Reading NDskel Node Str finished!")
+        return NodeStr_List
     
     def ReadNDskelSegStr(self, file:io.BufferedReader, length:int=0):
         # Note: Begins from Line 1564 of ${DISPERSE_SRC}/src/C/NDskeleton.c
-        # The dummy bytes of Fortran is -1 instead of correct size.
+        # The dummy bytes of Fortran is 0 instead of correct size.
         # All nnodes are contained in a block.
-        pass
+        if self.deBugFlag:
+            print("Reading NDskel Seg Str")
+        print("Warning: dummy block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
+        SegStr_List = []
+        for i in range(self.nsegs):
+            tmp = NDskl_seg_str()
+            tmp.pos_index = ReadBuffer(file, 4, np.int32)[0]
+            tmp.nodes = ReadBuffer(file, 2*4, np.int32)
+            tmp.flags = ReadBuffer(file, 4, np.int32)[0]
+            tmp.index = ReadBuffer(file, 4, np.int32)[0]
+            tmp.next_seg = ReadBuffer(file, 4, np.int32)[0]
+            tmp.prev_seg = ReadBuffer(file, 4, np.int32)[0]
+            tmp.__checkValid__()
+            SegStr_List.append(tmp)
+        print("Warning: dummy block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
+        if self.deBugFlag:
+            print("Reading NDskel Seg Str finished!")
+        return
     
     def __ReadBody__(self, s:dict, file:io.BufferedReader, type:str, target:str, FlagPtype, FlagMass, start, length, scale):
         if self.deBugFlag:
@@ -656,6 +696,9 @@ class Read():
         return dict
     
 def ReadBuffer(file:io.BufferedReader, size:int, dtype):
+    """
+    Raed buffer from file with size and dtype
+    """
     buffer = file.read(size)
     res = np.frombuffer(buffer, dtype)
     return res
@@ -811,3 +854,75 @@ def getNotHaloDisp(ppos1, ppos2, pid1, pid2, grplen2, boxSize):
     tmp_ppos2 = ppos2[np.sum(grplen2):]
     tmp_ppos1 = ppos1[sort1[tmp_pid2[:, 0] - 1]]
     return getParticleDisp(tmp_ppos1, tmp_ppos2, tmp_pid1, tmp_pid2, boxSize)
+
+# Here defines some structs used in above functions
+
+class NDskl_node_str:
+    def __init__(self):
+        self.pos_index:np.int32 = -1
+        self.flags:np.int32 = -1
+        self.nnext:np.int32 = -1
+        self.type:np.int32 = -1
+        self.index:np.int32 = -1
+        self.nsegs = np.array([], dtype=np.int32)
+        self.nextNode = np.array([], dtype=np.int32)
+        self.nextSeg = np.array([], dtype=np.int32)
+        
+    def __dict__(self):
+        return {"pos_index":self.pos_index, \
+                "flags":self.flags, \
+                "nnext":self.nnext, \
+                "type":self.type, \
+                "index":self.index, \
+                "nsegs":self.nsegs, \
+                "nextNode":self.nextNode, \
+                "nextSeg":self.nextSeg}
+    
+    def __checkValid__(self):
+        if self.pos_index < 0:
+            raise ValueError("pos_index is not valid")
+        if self.flags < 0:
+            raise ValueError("flags is not valid")
+        if self.nnext < 0:
+            raise ValueError("nnext is not valid")
+        if self.type < 0:
+            raise ValueError("type is not valid")
+        if self.index < 0:
+            raise ValueError("index is not valid")
+        if self.nsegs.size != self.nnext:
+            raise ValueError("nsegs length does not match nnext")
+        if self.nextNode.size != self.nnext:
+            raise ValueError("nextNode length does not match nnext")
+        if self.nextSeg.size != self.nnext:
+            raise ValueError("nextSeg length does not match nnext")
+
+class NDskl_seg_str:
+    def __init__(self):
+        self.pos_index:np.int32 = -1
+        self.nodes = [-1, -1]
+        self.flags:np.int32 = -1
+        self.index:np.int32 = -1
+        self.next_seg:np.int32 = -1
+        self.prev_seg:np.int32 = -1
+    
+    def __dict__(self):
+        return {"pos_index":self.pos_index, \
+                "nodes":self.nodes, \
+                "flags":self.flags, \
+                "index":self.index, \
+                "next_seg":self.next_seg, \
+                "prev_seg":self.prev_seg}
+    
+    def __checkValid__(self):
+        if self.pos_index < 0:
+            raise ValueError("pos_index is not valid")
+        if self.nodes[0] < 0 or self.nodes[1] < 0:
+            raise ValueError("nodes is not valid")
+        if self.flags < 0:
+            raise ValueError("flags is not valid")
+        if self.index < 0:
+            raise ValueError("index is not valid")
+        if self.next_seg < 0:
+            raise ValueError("next_seg is not valid")
+        if self.prev_seg < 0:
+            raise ValueError("prev_seg is not valid")
