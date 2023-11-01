@@ -427,6 +427,7 @@ class Read():
         # Note: Begins from Line 1539 of ${DISPERSE_SRC}/src/C/NDskeleton.c
         # The dummy bytes of Fortran is 0 instead of correct size.
         # All nnodes are contained in a block.
+        # TODO: Optimize large file reading
         if self.deBugFlag:
             print("Reading NDskel Node Str")
         print("Warning: dummy block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
@@ -453,6 +454,7 @@ class Read():
         # Note: Begins from Line 1564 of ${DISPERSE_SRC}/src/C/NDskeleton.c
         # The dummy bytes of Fortran is 0 instead of correct size.
         # All nnodes are contained in a block.
+        # TODO: Optimize large file reading
         if self.deBugFlag:
             print("Reading NDskel Seg Str")
         print("Warning: dummy block is not 0, probably some erroe occurs!") if ReadBuffer(file, 4, np.int32) != 0 else None
@@ -879,6 +881,18 @@ class NDskl_node_str:
                 "nextNode":self.nextNode, \
                 "nextSeg":self.nextSeg}
     
+    def help(self):
+        print("The NDskl_node_str contains the following elements:")
+        print("pos_index: the index of the node in the nodepos/nodedata array")
+        print("flags: the flags of the node (identify boundary nodes)")
+        print("nnext: number of connected arcs")
+        print("type: critical index (ndims+1 for bifurcations / trimmed arc axtremity)")
+        print("index: index of this node")
+        print("nsegs: number of segments in each connected arc")
+        print("nextNode: index of the other node of the arc")
+        print("nextSeg: index of the first segment on the arc")
+        return
+    
     def __checkValid__(self):
         if self.pos_index < 0:
             raise ValueError("pos_index is not valid")
@@ -913,6 +927,16 @@ class NDskl_seg_str:
                 "index":self.index, \
                 "next_seg":self.next_seg, \
                 "prev_seg":self.prev_seg}
+        
+    def help(self):
+        print("The NDskl_seg_str contains the following elements:")
+        print("pos_index: index in the segpos/segdata arrays")
+        print("nodes: index of the 2 nodes at the endpoints of the current arc")
+        print("flags: flags (identify boundary nodes)")
+        print("index: index of this segment")
+        print("next_seg: index of the next segment in the node (-1 if none)")
+        print("prev_seg: index of the previous segment in the node (-1 if none)")
+        return
     
     def __checkValid__(self):
         if self.pos_index < 0:
