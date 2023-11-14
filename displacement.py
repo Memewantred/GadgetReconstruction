@@ -87,11 +87,12 @@ class Read():
         self.nsegs = 0
         self.nnodes = 0
         self.ndims = 0
+        self.deBugFlag = deBugFlag
         s = {}
         scale = MpcUnit / 1000.
         filename = self.filename
         with open(filename, "rb") as f:
-            if deBugFlag:
+            if self.deBugFlag:
                 print("--------------Opening %s --------------"%(self.filename))
             s["filetype"] = self.ReadNDskelTag(f)
             s["header"] = self.ReadNDskelHeader(f)
@@ -105,10 +106,10 @@ class Read():
                 s["nodestr"] = self.ReadNDskelNodeStr(f)
             if Segstr:
                 s["segstr"] = self.ReadNDskelSegStr(f)
-            if deBugFlag:
+            if self.deBugFlag:
                 print("Read seg_str and node_str are not implemented yet")
             
-            if deBugFlag:
+            if self.deBugFlag:
                 print("--------------Closing %s --------------"%(self.filename))
         
         dict = {}
@@ -748,15 +749,15 @@ def WriteDTFE(filename, Npart, BoxSize, pos, vel=None, weight=None, DustType=Non
             pos = np.vstack((pos, tmp))
         elif DustType == "Generated":
             pos = np.vstack((pos, DustPos)).astype(np.float32)
+        elif DustType is not None:
+            raise ValueError(f"Unknown DustType {DustType}")
         # print(pos)
         f.write(pos.tobytes(order))
         # Write weight
         if weight is not None:
-            try:
-                if (Npart != len(weight)):
-                    raise ValueError(f"Weight should have length Nall={Npart} instead of len(weight)={len(weight)}")
-            except:
-                weight = weight.astype(np.float32)
+            if (Npart != len(weight)):
+                raise ValueError(f"Weight should have length Nall={Npart} instead of len(weight)={len(weight)}")
+            weight = weight.astype(np.float32)
             # if DustType is not None:
             #     try:
             #         if (Ndust != len(WeightDust)):
